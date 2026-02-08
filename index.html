@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>
+        
+    </h1>
+</body>
+</html><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora FF</title>
+
+<style>
+:root{
+    --rosa:#ff5fa2;
+    --rosa-dark:#ff3b8d;
+    --verde:#2ecc71;
+    --vermelho:#e74c3c;
+    --card:#151515;
+}
+*{box-sizing:border-box}
+
+body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:radial-gradient(circle at top,#1a1a1a,#000);
+    font-family:Arial;
+    color:#fff;
+}
+
+.card{
+    width:360px;
+    max-width:95%;
+    background:var(--card);
+    padding:20px;
+    border-radius:16px;
+    box-shadow:0 0 25px #000;
+}
+
+h2,h3{text-align:center;color:var(--rosa)}
+
+input,button{
+    width:100%;
+    padding:12px;
+    margin:6px 0;
+    border:none;
+    border-radius:8px;
+}
+
+input{
+    background:#222;
+    color:#fff;
+    text-align:center;
+}
+
+button{
+    font-weight:bold;
+    cursor:pointer;
+}
+
+.btn{
+    background:linear-gradient(135deg,var(--rosa),var(--rosa-dark));
+    color:#000;
+}
+
+.btn-win{background:var(--verde);color:#000}
+.btn-lose{background:var(--vermelho);color:#fff}
+.btn-exit{background:var(--vermelho);color:#fff}
+
+.rgb{
+    background:linear-gradient(90deg,red,orange,yellow,lime,cyan,blue,magenta,red);
+    background-size:400% 400%;
+    animation:rgb 3s linear infinite;
+    color:#000;
+}
+@keyframes rgb{
+    0%{background-position:0%}
+    100%{background-position:400%}
+}
+
+.apostas{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:6px;
+}
+
+.apostas button{background:#222;color:#fff}
+.apostas button.active{outline:2px solid var(--rosa)}
+
+small{color:#aaa}
+.hidden{display:none}
+</style>
+</head>
+
+<body>
+
+<div class="card" id="loginBox">
+    <h2>Calculadora FF</h2>
+    <input id="loginUser" placeholder="Usuário">
+    <input id="loginPass" type="password" placeholder="Senha">
+    <button class="btn" onclick="login()">Entrar</button>
+    <button class="btn" onclick="register()">Cadastrar</button>
+</div>
+
+<div class="card hidden" id="appBox">
+    <h3 class="rgb">🔥 Calculadora FF</h3>
+
+    <input id="saldo" disabled>
+
+    <input id="deposito" type="number" placeholder="Valor do depósito">
+    <button class="btn" onclick="depositar()">DEPOSITAR</button>
+
+    <div class="apostas">
+        <button onclick="apostar(1.5,this)">1,50</button>
+        <button onclick="apostar(2.5,this)">2,50</button>
+        <button onclick="apostar(3.5,this)">3,50</button>
+        <button onclick="apostar(5.5,this)">5,50</button>
+        <button onclick="apostar(10.5,this)">10,50</button>
+        <button onclick="apostar(20.5,this)">20,50</button>
+        <button onclick="apostar(50.5,this)">50,50</button>
+    </div>
+
+    <button class="btn-win" onclick="ganhou()">GANHOU</button>
+    <button class="btn-lose" onclick="perdeu()">PERDEU</button>
+
+    <div id="historico"></div>
+    <div id="estatisticas"></div>
+
+    <button class="rgb" onclick="resetarSaldo()">RESETAR SALDO</button>
+    <button class="btn-exit" onclick="logout()">SAIR</button>
+</div>
+
+<script>
+/* ELEMENTOS */
+const loginBox = document.getElementById("loginBox");
+const appBox = document.getElementById("appBox");
+const loginUser = document.getElementById("loginUser");
+const loginPass = document.getElementById("loginPass");
+const saldo = document.getElementById("saldo");
+const deposito = document.getElementById("deposito");
+const historico = document.getElementById("historico");
+const estatisticas = document.getElementById("estatisticas");
+
+/* DADOS */
+const premios={1.5:2,2.5:4,3.5:6,5.5:10,10.5:20,20.5:40,50.5:100};
+let apostaAtual=null;
+let usuarioAtual=null;
+
+const getUsers=()=>JSON.parse(localStorage.getItem("users")||"[]");
+const saveUsers=u=>localStorage.setItem("users",JSON.stringify(u));
+
+function corrigirUsuario(u){
+    if(!u.stats) u.stats={deposito:0,ganho:0,perda:0};
+    if(!u.hist) u.hist=[];
+    if(typeof u.saldo!=="number") u.saldo=0;
+    return u;
+}
+
+/* AUTH */
+function register(){
+    if(!loginUser.value||!loginPass.value) return alert("Preencha tudo");
+    let users=getUsers();
+    if(users.find(x=>x.user===loginUser.value)) return alert("Usuário já existe");
+    users.push(corrigirUsuario({user:loginUser.value,pass:loginPass.value,saldo:0}));
+    saveUsers(users);
+    alert("Cadastro realizado");
+}
+
+function login(){
+    let user=getUsers().find(x=>x.user===loginUser.value && x.pass===loginPass.value);
+    if(!user) return alert("Usuário ou senha incorretos");
+    usuarioAtual=corrigirUsuario(user);
+    localStorage.setItem("logado",usuarioAtual.user);
+    abrirApp();
+}
+
+function logout(){
+    localStorage.removeItem("logado");
+    location.reload();
+}
+
+/* APP */
+function abrirApp(){
+    loginBox.classList.add("hidden");
+    appBox.classList.remove("hidden");
+    atualizarTela();
+}
+
+function apostar(v,btn){
+    if(apostaAtual!==null) return alert("Finalize a aposta");
+    if(usuarioAtual.saldo<v) return alert("Saldo insuficiente");
+    apostaAtual=v;
+    usuarioAtual.saldo-=v;
+    document.querySelectorAll(".apostas button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    atualizarTela();
+}
+
+function ganhou(){
+    if(apostaAtual===null) return alert("Faça uma aposta");
+    usuarioAtual.saldo+=premios[apostaAtual];
+    usuarioAtual.stats.ganho+=premios[apostaAtual];
+    finalizar("✅ Ganhou");
+}
+
+function perdeu(){
+    if(apostaAtual===null) return alert("Faça uma aposta");
+    usuarioAtual.stats.perda+=apostaAtual;
+    finalizar("❌ Perdeu");
+}
+
+function finalizar(txt){
+    usuarioAtual.hist.unshift(`${txt} | Aposta ${apostaAtual}`);
+    apostaAtual=null;
+    document.querySelectorAll(".apostas button").forEach(b=>b.classList.remove("active"));
+    salvar();
+}
+
+function depositar(){
+    let v=parseFloat(deposito.value);
+    if(!v||v<=0) return alert("Valor inválido");
+    usuarioAtual.saldo+=v;
+    usuarioAtual.stats.deposito+=v;
+    usuarioAtual.hist.unshift(`💳 Depósito +${v.toFixed(2)}`);
+    deposito.value="";
+    salvar();
+}
+
+function resetarSaldo(){
+    if(!confirm("Resetar saldo?")) return;
+    usuarioAtual.saldo=0;
+    usuarioAtual.stats={deposito:0,ganho:0,perda:0};
+    usuarioAtual.hist.unshift("🔄 Saldo resetado");
+    apostaAtual=null;
+    salvar();
+}
+
+function salvar(){
+    let users=getUsers();
+    users[users.findIndex(u=>u.user===usuarioAtual.user)]=usuarioAtual;
+    saveUsers(users);
+    atualizarTela();
+}
+
+function atualizarTela(){
+    saldo.value="R$ "+usuarioAtual.saldo.toFixed(2);
+    historico.innerHTML=usuarioAtual.hist.slice(0,4).map(h=>`<small>${h}</small><br>`).join("");
+    let s=usuarioAtual.stats;
+    let lucro=s.ganho-s.perda;
+    estatisticas.innerHTML=`
+    <small>
+    💳 Depositado: R$ ${s.deposito.toFixed(2)}<br>
+    📈 Ganhos: R$ ${s.ganho.toFixed(2)}<br>
+    📉 Perdas: R$ ${s.perda.toFixed(2)}<br>
+    ${lucro>=0?"🟢 Lucro":"🔴 Prejuízo"}: R$ ${Math.abs(lucro).toFixed(2)}
+    </small>`;
+}
+
+/* AUTO LOGIN */
+const l=localStorage.getItem("logado");
+if(l){
+    const u=getUsers().find(x=>x.user===l);
+    if(u){usuarioAtual=corrigirUsuario(u);abrirApp();}
+}
+</script>
+
+</body>
+</html>
